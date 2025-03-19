@@ -342,7 +342,7 @@ def optimize(video, params, length_guess, config):
     #                   ])
 
     
-    num_parallel_runs = 1
+    num_parallel_runs = 1 if config.simulated_annealing_base_noise_variance == 0 else 64
     rng = jax.random.PRNGKey(0)
     seeds = jax.random.randint(rng, (num_parallel_runs,), 0, 10000)  # Generate random seeds
 
@@ -414,7 +414,6 @@ def plot_splines(image, recon, splines, config):
 def get_init_params(image, 
                     init_knots, 
                     config,
-                    n = 1,
                     s = 7, 
                     init_scale = None,
                     init_spline_contrast = 1.0,
@@ -426,13 +425,14 @@ def get_init_params(image,
                     init_background_translation = 0.,
                     init_kernel = None,
                     init_blob = None,
+                    prng_key = None,
                     ):
 
     
     assert image.ndim == 2 and image.shape[0] == image.shape[1], "image must have shape (res, res), but got shape {}".format(image.shape)
 
 
-    n, s = init_knots.shape[:2] if init_knots is not None else (n, s)
+    n, s = init_knots.shape[:2] if init_knots is not None else (config.n_splines, s)
 
     # get average distance between knots
     # mean_distance = jnp.sqrt(jnp.sum((init_knots[:, 1:] - init_knots[:, :-1])**2, axis=-1)).mean()
@@ -440,7 +440,7 @@ def get_init_params(image,
 
 
     if init_knots is None:
-        init_knots = get_init_knots(init_scale, config)
+        init_knots = get_init_knots(init_scale, config, prng_key=prng_key)
     else: 
         assert init_knots.ndim == 3, "init_knots must have shape (n_splines, s_knots, 2), but got shape {}".format(init_knots.shape)
 
@@ -541,7 +541,7 @@ def fit(image,
         # "simulated_annealing_base_noise_variance": 1e-4,
         
         # for real images, turn off simulated annealing
-        "simulated_annealing_base_noise_variance": 0.0,
+        "simulated_annealing_base_noise_variance": 0.0 if init_knots is not None else 3e-5,
         "simulated_annealing_decay": 0.7,
         "plot": plot,
         "return_uniform_spatial_grid": return_uniform_spatial_grid,
@@ -560,10 +560,11 @@ def fit(image,
     if init_knots is None:
         init_knots = [None] * image.shape[0]
 
+    prng_keys = random.split(random.PRNGKey(0), image.shape[0])
+
     params = [partial(get_init_params, 
                             config = config,
-                            n = 1,
-                            s = 7, 
+                            s = s, 
                             init_scale = init_scale,
                             init_spline_contrast = init_spline_contrast,
                             init_spline_brightness = init_spline_brightness,
@@ -573,10 +574,9 @@ def fit(image,
                             init_background_angle = init_background_angle,
                             init_background_translation = init_background_translation,
                             init_kernel = init_kernel,
-                            )(image, init_knots) for (image, init_knots) in zip(image, init_knots)]
+                            prng_key = prng_key,
+                            )(image, init_knots) for (image, init_knots, prng_key) in zip(image, init_knots, prng_keys)]
 
-    # print(params[0])
-    # print(params[1])
     
     # stack params for batch processing
 
@@ -609,13 +609,12 @@ def fit(image,
         # plot_splines(image, recon, splines, config)
     # print(params[0])
     # print(params[1])
-    print(params.spline_brightness, params.spline_contrast)
     recon, lengths, curvatures = batch_model(params, config)
-    plt.imshow(recon[0], cmap='gray', vmin=0, vmax=1)
-    plt.show()
+    for i in range(image.shape[0]):
+        plt.imshow(recon[i], cmap='gray', vmin=0, vmax=1)
+        plt.show()
 
     params, losses, loss_terms, params_history = optimize(image, params, length_guess, config)
-    print(params.spline_brightness, params.spline_contrast)
 
     if verbose:
         print("Final knots and params:")
