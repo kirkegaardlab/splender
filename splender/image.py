@@ -292,10 +292,10 @@ def optimize(video, params, length_guess, config):
     regularization = jnp.array([
                                 1e-4, # base scale
                                 2e-3, # curvature
-                                4e-3, # scale multiplier
+                                1e-2, # scale multiplier
                                 # 1e-3, # scale multiplier
                                 # 2e-3, # scale multiplier
-                                2e-2, # length prior
+                                2e-4, # length prior
                                 ])
 
     # sim2real
@@ -484,7 +484,8 @@ def get_init_params(image,
     init_params = init_params - init_param_mean
     init_param_mean = jnp.concatenate([init_param_mean, 5 * jnp.ones((n, 1, 1))], axis=2)
     init_params = jnp.concatenate([init_params, jnp.zeros((n, s, 1))], axis=2)
-    init_opacity = jnp.ones(1)
+    # init_opacity = jnp.ones(1)
+    init_opacity = jnp.ones(1) * 0.0
     params = (init_param_mean, 
               init_params, 
               init_scale, 
@@ -533,7 +534,8 @@ def fit(image,
         "atol": 1e-15,
         "learning_rate": 1e-2,
         "expected_width": init_scale if init_scale is not None else 1.0,
-        "expected_min_width": 0.7,
+        # "expected_min_width": 0.7,
+        "expected_min_width": 1.0,
         # "expected_min_width": 0.5,
         # "learning_rate": 3e-4,
         # "learning_rate": 3e-5,
