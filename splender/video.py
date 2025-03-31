@@ -122,12 +122,12 @@ def model(params, config, median_frame):
     video = sigmoid(params[3] * video + params[4])
 
 
-    frame_conv = lambda frame: jax.scipy.signal.convolve2d(frame, params[6], mode='same', boundary='fill')
+    frame_conv = lambda frame: jax.scipy.signal.convolve2d(frame, params[5], mode='same', boundary='fill')
     video = vmap(frame_conv)(video)
 
-    bg = params[8] * median_frame + params[9]
+    bg = params[7] * median_frame + params[8]
 
-    video = params[7] * video + (1 - params[7]) * bg.squeeze(-1)
+    video = params[6] * video + (1 - params[6]) * bg.squeeze(-1)
 
     return video, curvatures
 
@@ -138,12 +138,14 @@ def loss(params, video, median_frame, config):
     recon_loss = jnp.mean(diff**2)
 
     scale_reg = 1e-4 * (params[2] - 2.0)**2
-    curvature_reg = 1e-5 * jnp.mean(curvatures)
+    # curvature_reg = 1e-5 * jnp.mean(curvatures)
+    curvature_reg = 2e-1 * jnp.mean(curvatures)
     knot_params = params[0] + params[1]
 
     # regularize the first knot in each spline to be the same for all time points
-    knot_reg = 1e-3 * jnp.mean((knot_params[:, :1, :1, :] - knot_params[:, :1, :, :])**2)
-    return recon_loss + scale_reg + curvature_reg + knot_reg
+    knot_reg = 3e-1 * jnp.mean((knot_params[:, :1, :1, :] - knot_params[:, :1, :, :])**2)
+    temporal_reg = 1e-1 * jnp.mean((knot_params[:, :, 1:, :] - knot_params[:, :, :-1, :])**2)
+    return recon_loss + scale_reg + curvature_reg + knot_reg + temporal_reg
 
 @partial(jit, static_argnums=(4, 5))
 def update(params, opt_state, video, median_frame, opt, config):
@@ -173,14 +175,14 @@ def masked_optimize(video, params, config, mask, losses, max_iter):
 
 
 def optimize(video, params, config):
-    mask = (True, True, False, False, False, True, True, False, False, False)
+    mask = (True, True, False, False, False, True, False, False, False)
     params, losses = masked_optimize(video, params, config, mask, losses = [], max_iter = 1000)
     
     # mask = (True, True, False, False, False, True, False, False, False, False)
     # params, losses = masked_optimize(video, params, config, mask, losses = losses, max_iter = config.max_iter)
     # # params, losses = masked_optimize(video, params, config, mask, losses = [], max_iter = config.max_iter)
 
-    mask = (False, False, False, False, False, False, False, False, False, False)
+    mask = (False, False, False, False, False, False, False, False, False)
     params, losses = masked_optimize(video, params, config, mask, losses = losses, max_iter = config.max_iter)
     return params, losses
 
@@ -248,7 +250,7 @@ def get_init(video,
     init_params = vmap(knots2params)(init_knots)
     
     # subtract mean
-    init_param_mean = init_params.mean((1, 2), keepdims=True)
+    init_param_mean = init_params.mean(axis = -2, keepdims=True)
     init_params = init_params - init_param_mean
 
     rng = jax.random.PRNGKey(0)
@@ -262,7 +264,7 @@ def get_init(video,
     init_contrast = 1.0 * jnp.ones((1,))
     init_brightness = 0.0 * jnp.ones((1,))
 
-    params = (init_param_mean, init_params, init_scale, init_background_contrast, init_background_brightness, cnn_params, init_kernel, init_opacity, init_contrast, init_brightness)
+    params = (init_param_mean, init_params, init_scale, init_background_contrast, init_background_brightness, init_kernel, init_opacity, init_contrast, init_brightness)
 
     if verbose:
         print("Initial parameters:")
