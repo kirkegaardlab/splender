@@ -1,6 +1,9 @@
 import jax.numpy as jnp
 import rustworkx as rx
 from collections import deque
+from skimage.morphology import skeletonize
+import numpy as np
+import matplotlib.pyplot as plt
 
 def bfs_with_predecessors(tree: rx.PyGraph, start):
     """Runs BFS from `start`, returning the farthest node, distances, and predecessors."""
@@ -47,12 +50,20 @@ def longest_path_in_tree(tree: rx.PyGraph):
 
     return longest_path, len(longest_path) - 1  # Subtract 1 for edge count
 
-def get_splines_from_frame(frame, threshold = 0.8):
-    binary_img = frame > threshold
-    neighbors = jnp.stack([binary_img, jnp.roll(binary_img, 1, axis = 0), jnp.roll(binary_img, 1, axis = 1)], axis=-1)
-    inner_coords = jnp.stack(jnp.where(neighbors.sum(axis=-1) == 3)).T
+def get_splines_from_frame(frame, threshold = 0.5, neighbors = 'diagonal', thin = False, skeletonize_first = True):
+    
+    if skeletonize_first:
+        binary_img = skeletonize(np.array(frame) > threshold)
+    else:
+        binary_img = frame > threshold
 
-    coord_set = set(map(tuple, inner_coords.tolist()))
+    if thin:
+        neighbors = jnp.stack([binary_img, jnp.roll(binary_img, 1, axis = 0), jnp.roll(binary_img, 1, axis = 1)], axis=-1)
+        inner_coords = jnp.stack(jnp.where(neighbors.sum(axis=-1) == 3)).T
+
+        coord_set = set(map(tuple, inner_coords.tolist()))
+    else:
+        coord_set = set(map(tuple, jnp.stack(jnp.where(binary_img)).T.tolist()))
 
     # Create the graph
     graph = rx.PyGraph(multigraph=False)
@@ -64,10 +75,15 @@ def get_splines_from_frame(frame, threshold = 0.8):
     for coord in coord_set:
         node_indices[coord] = graph.add_node(coord)
 
+    if neighbors == 'diagonal':
+        increments = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+    else:
+        increments = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
     # Add edges between neighbors
     for x, y in coord_set:
         node_idx = node_indices[(x, y)]
-        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:  # Left, right, up, down
+        for dx, dy in increments:  # Left, right, up, down
             neighbor = (x + dx, y + dy)
             if neighbor in node_indices:  # Only connect if neighbor exists
                 graph.add_edge(node_idx, node_indices[neighbor], 1)
