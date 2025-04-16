@@ -1,5 +1,5 @@
 from flax import linen as nn
-from .utils import circle_image, knots2params, params2knots, get_idenitity_kernel
+from .utils import circle_image, knots2params, params2knots
 import jax.numpy as jnp
 from jax import grad, jit, vmap, value_and_grad
 import jax
@@ -13,95 +13,61 @@ from jax.scipy.special import logit
 import optax
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import equinox as eqx
 import jax.tree_util as jtu
-from dataclasses import dataclass, field
-from abc import ABC, abstractmethod
 
-@jax.tree_util.register_dataclass
-@dataclass
-class Splender(ABC):
+class Splender(eqx.Module):
     """
     Parent class for SplenderImage and SplenderVideo.
     This class is not meant to be used directly.
     """
-    brush_profile: jax.Array = None #= field(default=None)
-    spline_contrast: jax.Array = None #= field(default=None)
-    spline_brightness: jax.Array = None #= field(default=None)
-    loc_params: jax.Array = None #= field(default=None)
-    knot_params: jax.Array = None #= field(default=None)
-    kernel: jax.Array = None #= field(default=None)
-    contrast: jax.Array = None #= field(default=None)
-    brightness: jax.Array = None #= field(default=None)
-    opacity: jax.Array = None #= field(default=None)
-    global_scale: jax.Array = None #= field(default=None)
-    res: int = field(metadata=dict(static=True), default=128)
-    n_images: int = field(metadata=dict(static=True), default=1)
-    n_splines: int = field(metadata=dict(static=True), default=1)
-    s_knots: int = field(metadata=dict(static=True), default=7)
-    n_points_per_spline_per_frame: int = field(metadata=dict(static=True), default=100)
-    eps: float = field(metadata=dict(static=True), default=1e-6)
+    res: int = 128
+    n_images: int = 1
+    n_splines: int = 1
+    s_knots: int = 7
+    n_points_per_spline_per_frame: int = 100
+    brush_profile: jax.Array
+    spline_contrast: jax.Array
+    spline_brightness: jax.Array
+    loc_params: jax.Array
+    knot_params: jax.Array
+    kernel: jax.Array
+    contrast: jax.Array
+    brightness: jax.Array
+    opacity: jax.Array
+    global_scale: jax.Array
+    eps: float = 1e-6
 
-    @classmethod
-    def init(cls, 
-             key, 
-             brush_profile = brush_profile,
-             spline_contrast = spline_contrast,
-             spline_brightness = spline_brightness,
-             loc_params = loc_params,
-             knot_params = knot_params,
-             kernel = kernel,
-             contrast = contrast,
-             brightness = brightness,
-             opacity = opacity,
-             global_scale = global_scale,
-             res = res.default,
-             n_images = n_images.default,
-             n_splines = n_splines.default,
-             s_knots = s_knots.default,
-             n_points_per_spline_per_frame = n_points_per_spline_per_frame.default,
-             eps = eps.default,
-             init_knots = None,
-             ):
-        # if res is not None:
-        #     res = res
-        brush_profile = jnp.linspace(-1, 1, 13)**2
-        spline_contrast = jnp.ones((1,))
-        spline_brightness = jnp.zeros((1,))
+
+    def get_init_kernel(self, rng):
+        init_kernel = jnp.zeros((3, 3))
+        init_kernel = init_kernel.at[1, 1].set(1.0)
+        return init_kernel
+
+    def __init__(self, key, init_knots = None, res = None):
+        if res is not None:
+            self.res = res
+        self.brush_profile = jnp.linspace(-1, 1, 13)**2
+        self.spline_contrast = jnp.ones((1,))
+        self.spline_brightness = jnp.zeros((1,))
         if init_knots is not None:
             init_knot_params = logit(init_knots)
             init_param_mean = init_knot_params.mean(-2, keepdims=True)
             init_params = init_knot_params - init_param_mean
-            n_images = init_knot_params.shape[0]
-            n_splines = init_knot_params.shape[1]
-            s_knots = init_knot_params.shape[2]
-            loc_params = jnp.concatenate([init_param_mean, 5 * jnp.ones((n_images, n_splines, 1, 1))], axis=-1)
-            knot_params = jnp.concatenate([init_params, jnp.zeros((n_images, n_splines, s_knots, 1))], axis=-1)
+            self.n_images = init_knot_params.shape[0]
+            self.n_splines = init_knot_params.shape[1]
+            self.s_knots = init_knot_params.shape[2]
+            self.loc_params = jnp.concatenate([init_param_mean, 5 * jnp.ones((self.n_images, self.n_splines, 1, 1))], axis=-1)
+            self.knot_params = jnp.concatenate([init_params, jnp.zeros((self.n_images, self.n_splines, self.s_knots, 1))], axis=-1)
         else:            
-            loc_params = jnp.zeros((n_splines, 1, 3))
-            knot_params = jnp.zeros((n_splines, s_knots, 3))
-        kernel = get_idenitity_kernel(key)
-        contrast = jnp.ones((1,))
-        brightness = jnp.zeros((1,))
-        opacity = jnp.ones((1,))
-        global_scale = jnp.ones((1,)) * res / 100
-        return cls(
-            brush_profile=brush_profile,
-            spline_contrast=spline_contrast,
-            spline_brightness=spline_brightness,
-            loc_params=loc_params,
-            knot_params=knot_params,
-            kernel=kernel,
-            contrast=contrast,
-            brightness=brightness,
-            opacity=opacity,
-            global_scale=global_scale,
-            res=res,
-            n_images=n_images,
-            n_splines=n_splines,
-            s_knots=s_knots,
-            n_points_per_spline_per_frame=n_points_per_spline_per_frame,
-            eps=eps,
-            )
+            self.loc_params = jnp.zeros((self.n_splines, 1, 3))
+            self.knot_params = jnp.zeros((self.n_splines, self.s_knots, 3))
+        self.kernel = self.get_init_kernel(key)
+        self.contrast = jnp.ones((1,))
+        self.brightness = jnp.zeros((1,))
+        self.opacity = jnp.ones((1,))
+        self.global_scale = jnp.ones((1,)) * self.res / 100
+
 
     def brush_model(self):
         """
@@ -168,8 +134,7 @@ class Splender(ABC):
     def __call__(self):
         NotImplementedError("This method should be implemented in subclasses.")
 
-@jax.tree_util.register_dataclass
-@dataclass
+
 class SplenderImage(Splender):
 
     def spatial_derivative(self, spline, degree = 1):
@@ -235,9 +200,9 @@ class SplenderImage(Splender):
     
     def render_image(self, knots):
         splines_image, lengths, curvatures = self.render_splines(knots)
-        # splines_image = splines_image * spline_contrast + spline_brightness
+        # splines_image = splines_image * self.spline_contrast + self.spline_brightness
 
-        image = splines_image #+ logistic_background()
+        image = splines_image #+ self.logistic_background()
 
         image = jax.scipy.signal.convolve2d(image, self.kernel, mode='same', boundary='fill')
 
