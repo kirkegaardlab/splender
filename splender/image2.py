@@ -1,4 +1,3 @@
-from flax import linen as nn
 from .utils import circle_image, knots2params, params2knots, get_idenitity_kernel
 import jax.numpy as jnp
 from jax import grad, jit, vmap, value_and_grad
@@ -24,16 +23,18 @@ class Splender(ABC):
     Parent class for SplenderImage and SplenderVideo.
     This class is not meant to be used directly.
     """
-    brush_profile: jax.Array = None #= field(default=None)
-    spline_contrast: jax.Array = None #= field(default=None)
-    spline_brightness: jax.Array = None #= field(default=None)
-    loc_params: jax.Array = None #= field(default=None)
-    knot_params: jax.Array = None #= field(default=None)
-    kernel: jax.Array = None #= field(default=None)
-    contrast: jax.Array = None #= field(default=None)
-    brightness: jax.Array = None #= field(default=None)
-    opacity: jax.Array = None #= field(default=None)
-    global_scale: jax.Array = None #= field(default=None)
+    key : jax.random.PRNGKey = field(metadata=dict(static=True), default=None)
+    init_knots: jax.Array = None
+    brush_profile: jax.Array = None
+    spline_contrast: jax.Array = None
+    spline_brightness: jax.Array = None
+    loc_params: jax.Array = None
+    knot_params: jax.Array = None
+    kernel: jax.Array = None
+    contrast: jax.Array = None
+    brightness: jax.Array = None
+    opacity: jax.Array = None
+    global_scale: jax.Array = None
     res: int = field(metadata=dict(static=True), default=128)
     n_images: int = field(metadata=dict(static=True), default=1)
     n_splines: int = field(metadata=dict(static=True), default=1)
@@ -41,67 +42,37 @@ class Splender(ABC):
     n_points_per_spline_per_frame: int = field(metadata=dict(static=True), default=100)
     eps: float = field(metadata=dict(static=True), default=1e-6)
 
-    @classmethod
-    def init(cls, 
-             key, 
-             brush_profile = brush_profile,
-             spline_contrast = spline_contrast,
-             spline_brightness = spline_brightness,
-             loc_params = loc_params,
-             knot_params = knot_params,
-             kernel = kernel,
-             contrast = contrast,
-             brightness = brightness,
-             opacity = opacity,
-             global_scale = global_scale,
-             res = res.default,
-             n_images = n_images.default,
-             n_splines = n_splines.default,
-             s_knots = s_knots.default,
-             n_points_per_spline_per_frame = n_points_per_spline_per_frame.default,
-             eps = eps.default,
-             init_knots = None,
-             ):
-        # if res is not None:
-        #     res = res
-        brush_profile = jnp.linspace(-1, 1, 13)**2
-        spline_contrast = jnp.ones((1,))
-        spline_brightness = jnp.zeros((1,))
-        if init_knots is not None:
-            init_knot_params = logit(init_knots)
+
+    def __post_init__(self):
+        self.brush_profile = jnp.linspace(-1, 1, 13)**2 if self.brush_profile is None else self.brush_profile
+        self.spline_contrast = jnp.ones((1,)) if self.spline_contrast is None else self.spline_contrast
+        self.spline_brightness = jnp.zeros((1,)) if self.spline_brightness is None else self.spline_brightness
+        if self.init_knots is not None:
+            init_knot_params = logit(self.init_knots)
             init_param_mean = init_knot_params.mean(-2, keepdims=True)
             init_params = init_knot_params - init_param_mean
-            n_images = init_knot_params.shape[0]
-            n_splines = init_knot_params.shape[1]
+            self.n_images = init_knot_params.shape[0]
+            self.n_splines = init_knot_params.shape[1]
             s_knots = init_knot_params.shape[2]
-            loc_params = jnp.concatenate([init_param_mean, 5 * jnp.ones((n_images, n_splines, 1, 1))], axis=-1)
-            knot_params = jnp.concatenate([init_params, jnp.zeros((n_images, n_splines, s_knots, 1))], axis=-1)
+            self.loc_params = jnp.concatenate([init_param_mean, 5 * jnp.ones((self.n_images, self.n_splines, 1, 1))], axis=-1)
+            self.knot_params = jnp.concatenate([init_params, jnp.zeros((self.n_images, self.n_splines, s_knots, 1))], axis=-1)
         else:            
-            loc_params = jnp.zeros((n_splines, 1, 3))
-            knot_params = jnp.zeros((n_splines, s_knots, 3))
-        kernel = get_idenitity_kernel(key)
-        contrast = jnp.ones((1,))
-        brightness = jnp.zeros((1,))
-        opacity = jnp.ones((1,))
-        global_scale = jnp.ones((1,)) * res / 100
-        return cls(
-            brush_profile=brush_profile,
-            spline_contrast=spline_contrast,
-            spline_brightness=spline_brightness,
-            loc_params=loc_params,
-            knot_params=knot_params,
-            kernel=kernel,
-            contrast=contrast,
-            brightness=brightness,
-            opacity=opacity,
-            global_scale=global_scale,
-            res=res,
-            n_images=n_images,
-            n_splines=n_splines,
-            s_knots=s_knots,
-            n_points_per_spline_per_frame=n_points_per_spline_per_frame,
-            eps=eps,
-            )
+            self.loc_params = jnp.zeros((self.n_splines, 1, 3))
+            self.knot_params = jnp.zeros((self.n_splines, s_knots, 3))
+        self.kernel = get_idenitity_kernel(self.key) if self.kernel is None else self.kernel
+        self.contrast = jnp.ones((1,)) if self.contrast is None else self.contrast
+        self.brightness = jnp.zeros((1,)) if self.brightness is None else self.brightness
+        self.opacity = jnp.ones((1,)) if self.opacity is None else self.opacity
+        if self.global_scale is None:
+            self.global_scale = jnp.ones((self.images, self.n_splines)) * self.res / 100
+        elif hasattr(self.global_scale, 'shape') and self.global_scale.shape == (self.n_images, self.n_splines):
+            self.global_scale = jnp.ones((self.n_images, self.n_splines)) * self.res / 100
+        elif hasattr(self.global_scale, 'shape') and self.global_scale.shape == (self.n_images,):
+            self.global_scale = jnp.ones((self.n_images, self.n_splines)) * self.global_scale[:, None] * self.res / 100
+        elif isinstance(self.global_scale, float):
+            self.global_scale = jnp.ones((self.n_images, self.n_splines)) * self.global_scale * self.res / 100
+        else:
+            raise ValueError("global_scale must be a scalar or have shape (n_images,) or (n_images, n_splines).")
 
     def brush_model(self):
         """
@@ -124,7 +95,6 @@ class Splender(ABC):
         return scale_and_translate(
             brush_image, (self.res, self.res), (0, 1),
             scale * jnp.ones(2), point_mapped_to_image, method='cubic')
-    
 
 
     def get_uniform_points(self, x_spline, y_spline):
@@ -163,7 +133,6 @@ class Splender(ABC):
         delta_s = s_fine[1] - s_fine[0]
         curvature = jnp.sqrt(d2x_ds2(s_fine)**2 + d2y_ds2(s_fine)**2 + self.eps) * delta_s
         return curvature.mean(0)
-
     
     def __call__(self):
         NotImplementedError("This method should be implemented in subclasses.")
@@ -188,7 +157,7 @@ class SplenderImage(Splender):
         scale_spline = Interpolator1D(s, scale_knots, method="cubic")
         return x_spline, y_spline, scale_spline
     
-    def render_spline(self, x_spline, y_spline, scale_spline):
+    def render_spline(self, x_spline, y_spline, scale_spline, scale):
         # Get uniform points
         s_uniform = self.get_uniform_points(x_spline, y_spline)
         
@@ -202,19 +171,21 @@ class SplenderImage(Splender):
                         vmap(self.render_point, in_axes=(0, 0))
                             (
                                 jnp.stack([y_points, x_points], axis=-1),
-                                self.global_scale * scale_points,
+                                scale * scale_points,
                             ),
                         axis=0
                     )
         return image
     
-    def render_splines(self, knots):
+    def render_splines(self, knots, scales):
         """
-        Render all splines in a separate image.
+        Render all splines in an image.
+        For each spline, 
         If knot_params are all zeros, the image is empty.
         This allows for batching with a varying number of splines across the batch.
         """
-        def maybe_render_spline(knot_params):
+        def maybe_render_spline(knot_params, scale):
+
             def render_empty():
                 return jnp.zeros((self.res, self.res)), 0., 0.
             
@@ -222,19 +193,19 @@ class SplenderImage(Splender):
                 x_spline, y_spline, scale_spline = self.fit_spline(knot_params)
                 length = self.cumulative_spline_length(x_spline, y_spline)[-1]
                 curvature = self.mean_spline_curvature(x_spline, y_spline)
-                return self.render_spline(x_spline, y_spline, scale_spline), length, curvature
+                return self.render_spline(x_spline, y_spline, scale_spline, scale), length, curvature
             
             return jax.lax.cond(jnp.all(knot_params[:2] == 0), render_empty, render_spline)
         
-        spline_images, lengths, curvatures = vmap(maybe_render_spline)(knots)
+        spline_images, lengths, curvatures = vmap(maybe_render_spline)(knots, scales)
         
         # aggregate spline_images
         splines_image = jnp.max(spline_images, axis=0) * self.opacity + jnp.sum(spline_images, axis=0) * (1 - self.opacity)
 
         return splines_image, lengths, curvatures
     
-    def render_image(self, knots):
-        splines_image, lengths, curvatures = self.render_splines(knots)
+    def render_image(self, knots, scales):
+        splines_image, lengths, curvatures = self.render_splines(knots, scales)
         # splines_image = splines_image * spline_contrast + spline_brightness
 
         image = splines_image #+ logistic_background()
@@ -247,5 +218,5 @@ class SplenderImage(Splender):
     
     def __call__(self):
         knots = self.loc_params + self.knot_params
-        images, lengths, curvatures = jax.vmap(self.render_image)(knots)
+        images, lengths, curvatures = jax.vmap(self.render_image)(knots, self.global_scale)
         return images, lengths, curvatures
