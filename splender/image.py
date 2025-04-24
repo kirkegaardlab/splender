@@ -23,22 +23,12 @@ class SplenderImage(Splender):
             init_params = init_knot_params - init_param_mean
             self.n_images = init_knot_params.shape[0]
             self.n_splines = init_knot_params.shape[1]
-            s_knots = init_knot_params.shape[2]
+            self.s_knots = init_knot_params.shape[2]
             self.loc_params = jnp.concatenate([init_param_mean, 5 * jnp.ones((self.n_images, self.n_splines, 1, 1))], axis=-1)
-            self.knot_params = jnp.concatenate([init_params, jnp.zeros((self.n_images, self.n_splines, s_knots, 1))], axis=-1)
-        else:            
-            self.loc_params = jnp.zeros((self.n_splines, 1, 3))
-            self.knot_params = jnp.zeros((self.n_splines, s_knots, 3))
-        if self.global_scale is None:
-            self.global_scale = jnp.ones((self.images, self.n_splines)) * self.res / 100
-        elif hasattr(self.global_scale, 'shape') and self.global_scale.shape == (self.n_images, self.n_splines):
-            self.global_scale = jnp.ones((self.n_images, self.n_splines)) * self.res / 100
-        elif hasattr(self.global_scale, 'shape') and self.global_scale.shape == (self.n_images,):
-            self.global_scale = jnp.ones((self.n_images, self.n_splines)) * self.global_scale[:, None] * self.res / 100
-        elif isinstance(self.global_scale, float):
-            self.global_scale = jnp.ones((self.n_images, self.n_splines)) * self.global_scale * self.res / 100
+            self.knot_params = jnp.concatenate([init_params, jnp.zeros((self.n_images, self.n_splines, self.s_knots, 1))], axis=-1)
         else:
-            raise ValueError("global_scale must be a scalar or have shape (n_images,) or (n_images, n_splines).")
+            self.loc_params = jnp.zeros((self.n_splines, 1, 3))
+            self.knot_params = jnp.zeros((self.n_splines, self.s_knots, 3))
 
     def spatial_derivative(self, spline, degree = 1):
         return partial(spline, dx=degree)

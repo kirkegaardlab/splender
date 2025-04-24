@@ -43,6 +43,16 @@ class Splender(ABC):
         self.contrast = jnp.ones((1,)) if self.contrast is None else self.contrast
         self.brightness = jnp.zeros((1,)) if self.brightness is None else self.brightness
         self.opacity = jnp.ones((1,)) if self.opacity is None else self.opacity
+        if self.global_scale is None:
+            self.global_scale = jnp.ones((self.images, self.n_splines)) * self.res / 100
+        elif hasattr(self.global_scale, 'shape') and self.global_scale.shape == (self.n_images, self.n_splines):
+            self.global_scale = jnp.ones((self.n_images, self.n_splines)) * self.res / 100
+        elif hasattr(self.global_scale, 'shape') and self.global_scale.shape == (self.n_images,):
+            self.global_scale = jnp.ones((self.n_images, self.n_splines)) * self.global_scale[:, None] * self.res / 100
+        elif isinstance(self.global_scale, float):
+            self.global_scale = jnp.ones((self.n_images, self.n_splines)) * self.global_scale * self.res / 100
+        else:
+            raise ValueError("global_scale must be a scalar or have shape (n_images,) or (n_images, n_splines).")
 
 
     def brush_model(self):
