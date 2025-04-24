@@ -93,3 +93,9 @@ def grid_mean(arr, cell_size):
     `cell_size` (a tuple: (cell_h, cell_w, cell_d)) and returns the mean in each cell.
     """
     return mean_grid_fixed(arr, cell_size[0], cell_size[1], cell_size[2])
+
+def get_identity_kernel(rng, size = 3):
+    idenitity_kernel = jnp.zeros((size, size))
+    idenitity_kernel = idenitity_kernel.at[size // 2, size // 2].set(1.0)
+    return idenitity_kernel
+

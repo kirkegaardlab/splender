@@ -6,7 +6,7 @@ from jax.image import scale_and_translate
 from interpax import Interpolator1D
 import jax.tree_util as jtu
 from dataclasses import dataclass, field
-from .utils import get_idenitity_kernel
+from .utils import get_identity_kernel
 from abc import ABC, abstractmethod
 
 @jtu.register_dataclass
@@ -39,7 +39,7 @@ class Splender(ABC):
         self.brush_profile = jnp.linspace(-1, 1, 13)**2 if self.brush_profile is None else self.brush_profile
         self.spline_contrast = jnp.ones((1,)) if self.spline_contrast is None else self.spline_contrast
         self.spline_brightness = jnp.zeros((1,)) if self.spline_brightness is None else self.spline_brightness
-        self.kernel = get_idenitity_kernel(self.key) if self.kernel is None else self.kernel
+        self.kernel = get_identity_kernel(self.key) if self.kernel is None else self.kernel
         self.contrast = jnp.ones((1,)) if self.contrast is None else self.contrast
         self.brightness = jnp.zeros((1,)) if self.brightness is None else self.brightness
         self.opacity = jnp.ones((1,)) if self.opacity is None else self.opacity
