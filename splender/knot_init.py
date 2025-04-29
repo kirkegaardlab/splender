@@ -60,6 +60,9 @@ def get_splines_from_frame(frame, threshold = 0.5, neighbors = 'diagonal', thin 
     else:
         binary_img = frame > threshold
 
+    plt.figure()
+    plt.imshow(binary_img)
+
     if thin:
         neighbors = jnp.stack([binary_img, jnp.roll(binary_img, 1, axis = 0), jnp.roll(binary_img, 1, axis = 1)], axis=-1)
         inner_coords = jnp.stack(jnp.where(neighbors.sum(axis=-1) == 3)).T
@@ -136,9 +139,9 @@ def get_uniform_points(x_spline, y_spline, n_points_per_spline = 8):
     s_uniform = jnp.interp(jnp.linspace(0, cumulative_length[-1], n_points_per_spline), cumulative_length, s_fine)
     return s_uniform, cumulative_length[-1]
 
-def downsample_points(coords):
+def downsample_points(coords, n_points_per_spline = 8):
     x_spline, y_spline = fit_spline(coords)
-    s_uniform, length = get_uniform_points(x_spline, y_spline, n_points_per_spline=8)
+    s_uniform, length = get_uniform_points(x_spline, y_spline, n_points_per_spline=n_points_per_spline)
     x = x_spline(s_uniform)
     y = y_spline(s_uniform)
     return jnp.stack([x, y], axis=-1)

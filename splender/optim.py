@@ -7,14 +7,13 @@ from jax import grad, jit, vmap, value_and_grad
 import optax
 
 @jit
-def loss(model, images):
+def loss(model, batch):
     """
-    Loss per image, summed over all images
+    Loss per image, summed over all batch
     """
     recon, lengths, curvatures = model()
-    assert recon.ndim == 3
-    assert recon.shape == images.shape
-    recon_loss = jnp.mean((images - recon) ** 2, axis=(-1, -2))
+    assert recon.shape == batch.shape
+    recon_loss = jnp.mean((batch - recon) ** 2, axis=(-1, -2, -3)[:batch.ndim - 1]) # don't mean over batch yet
     min_scale_knots = jax.nn.sigmoid((model.loc_params + model.knot_params)[..., 2]).min(axis = -1)
     # jax.debug.print("min_scale_knots: {min_scale_knots}", min_scale_knots=min_scale_knots)
     scale_multiplier_reg = 1e-3 * ((min_scale_knots - 1.0)**2).mean(axis=-1)
@@ -23,17 +22,16 @@ def loss(model, images):
     length_reg = 1e-3 * lengths.mean(axis=-1)
     return (recon_loss + scale_multiplier_reg + curvature_reg + length_reg).sum()
 
-
-def fit(model, images, n_iter=1000):
+def fit(model, batch, n_iter=1000):
     optim = optax.adam(1e-2)
-    def make_step(model, images, opt_state):
-        loss_value, grads = value_and_grad(loss)(model, images)
+    def make_step(model, batch, opt_state):
+        loss_value, grads = value_and_grad(loss)(model, batch)
         updates, opt_state = optim.update(grads, opt_state, model)
         model = optax.apply_updates(model, updates)
         return model, opt_state, loss_value
     losses = []
     opt_state = optim.init(model)
     for step in range(n_iter):
-        model, opt_state, loss_value = make_step(model, images, opt_state)
+        model, opt_state, loss_value = make_step(model, batch, opt_state)
         losses.append(loss_value)
     return model, losses

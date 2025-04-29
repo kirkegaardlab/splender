@@ -21,15 +21,24 @@ class SplenderImage(Splender):
             init_knot_params = logit(self.init_knots)
             init_param_mean = init_knot_params.mean(-2, keepdims=True)
             init_params = init_knot_params - init_param_mean
-            self.n_images = init_knot_params.shape[0]
+            self.n_batch = init_knot_params.shape[0]
             self.n_splines = init_knot_params.shape[1]
             self.s_knots = init_knot_params.shape[2]
-            self.loc_params = jnp.concatenate([init_param_mean, 5 * jnp.ones((self.n_images, self.n_splines, 1, 1))], axis=-1)
-            self.knot_params = jnp.concatenate([init_params, jnp.zeros((self.n_images, self.n_splines, self.s_knots, 1))], axis=-1)
+            self.loc_params = jnp.concatenate([init_param_mean, 5 * jnp.ones((self.n_batch, self.n_splines, 1, 1))], axis=-1)
+            self.knot_params = jnp.concatenate([init_params, jnp.zeros((self.n_batch, self.n_splines, self.s_knots, 1))], axis=-1)
         else:
             self.loc_params = jnp.zeros((self.n_splines, 1, 3))
             self.knot_params = jnp.zeros((self.n_splines, self.s_knots, 3))
 
+        if self.global_scale is None or hasattr(self.global_scale, 'shape') and self.global_scale.shape == (self.n_batch, self.n_splines):
+            self.global_scale = jnp.ones((self.n_batch, self.n_splines)) * self.res / 100
+        elif hasattr(self.global_scale, 'shape') and self.global_scale.shape == (self.n_batch,):
+            self.global_scale = jnp.ones((self.n_batch, self.n_splines)) * self.global_scale[:, None] * self.res / 100
+        elif isinstance(self.global_scale, float):
+            self.global_scale = jnp.ones((self.n_batch, self.n_splines)) * self.global_scale * self.res / 100
+        else:
+            raise ValueError("global_scale must be a scalar or have shape (n_batch,) or (n_batch, n_splines).")
+        
     def spatial_derivative(self, spline, degree = 1):
         return partial(spline, dx=degree)
 
@@ -107,5 +116,7 @@ class SplenderImage(Splender):
     
     def __call__(self):
         knots = self.loc_params + self.knot_params
+        print(knots.shape)
+        print(self.global_scale.shape)
         images, lengths, curvatures = jax.vmap(self.render_image)(knots, self.global_scale)
         return images, lengths, curvatures
