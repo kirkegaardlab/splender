@@ -52,7 +52,7 @@ class SplenderVideo(Splender):
     def fit_spline(self, params):
         knots = sigmoid(params)
 
-        x, y, scale_knots = knots[..., 0], knots[..., 1], knots[..., 2]
+        x, y, scale_knots = knots[..., 0], knots[..., 1], knots[..., 0, 2]
 
         s = jnp.linspace(0, 1, knots.shape[0])
         t = jnp.linspace(0, 1, knots.shape[1])
@@ -76,7 +76,8 @@ class SplenderVideo(Splender):
         # Get the points on the spline for all time steps
         x_points = vmap(x_spline)(S, T)
         y_points = vmap(y_spline)(S, T)
-        scale_points = scale_spline(s_fine) # mean of S?
+        # scale_points = scale_spline(s_fine)
+        scale_points = vmap(scale_spline)(S)
         
         # Render the points
         all_points = vmap(self.render_point, in_axes=(0, 0))(

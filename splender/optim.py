@@ -6,7 +6,6 @@ import jax.tree_util as jtu
 from jax import grad, jit, vmap, value_and_grad
 import optax
 
-@jit
 def loss(model, batch):
     """
     Loss per image, summed over all batch
@@ -21,15 +20,32 @@ def loss(model, batch):
     scale_multiplier_reg = 1e-3 * ((min_scale_knots - 1.0)**2).mean(axis=(-1, -2)[:lengths.ndim - 1])
     # curvature_reg = 1e-2 * curvatures.mean(axis=(-1, -2)[:lengths.ndim - 1])
     # curvature_reg = 1e-3 * curvatures.mean(axis=(-1, -2)[:lengths.ndim - 1])
-    curvature_reg = 1e-3 * curvatures.mean(axis=(-1, -2)[:lengths.ndim - 1])
-    length_reg = 1e-3 * lengths.mean(axis=(-1, -2)[:lengths.ndim - 1])
+    curvature_reg = 3e-3 * curvatures.mean(axis=(-1, -2)[:lengths.ndim - 1])
+    length_reg = 1e-4 * lengths.mean(axis=(-1, -2)[:lengths.ndim - 1])
     # jax.debug.print("curvature_reg: {curvature_reg}", curvature_reg=curvature_reg)
     # jax.debug.print("recon_loss: {recon_loss}", recon_loss=recon_loss)
-    return (recon_loss + scale_multiplier_reg + curvature_reg + length_reg).sum()
+    return (2 * recon_loss) + scale_multiplier_reg + curvature_reg + length_reg, lengths
 
-def fit(model, batch, n_iter=1000, lr=1e-2):
+@jit
+def image_loss(model, batch):
+    loss_per_image, _ = loss(model, batch)
+    return loss_per_image.sum()
+
+@jit
+def video_loss(model, batch):
+    loss_per_video, lengths = loss(model, batch)
+    knot_params = (model.loc_params + model.knot_params)[..., 2]
+    anchor_knot_reg = 1e-2 * ((knot_params[:, :1, :1, :] - knot_params[:, :1, :, :])**2).mean(axis=(-1, -2)[:lengths.ndim - 1])
+    equal_length_reg = 1e-1 * ((lengths[:, :, :-1] - lengths[:, :, 1:])**2).mean(axis=(-1, -2)[:lengths.ndim - 1])
+    return (loss_per_video + anchor_knot_reg + equal_length_reg).sum()
+
+
+def fit(model, batch, n_iter=1000, lr=1e-2, video = True):
+    model.__manual_post_init__()
     # assert batch has values in [0, 1]
     assert jnp.all(batch >= 0) and jnp.all(batch <= 1)
+
+    loss = video_loss if video else image_loss
 
     optim = optax.adam(lr)
     def make_step(model, batch, opt_state):
