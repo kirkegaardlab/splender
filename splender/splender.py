@@ -30,6 +30,8 @@ class Splender(ABC):
     global_scale: jax.Array = None
     res: int = field(metadata=dict(static=True), default=128)
     n_batch: int = field(metadata=dict(static=True), default=1)
+    n_frames: int = field(metadata=dict(static=True), default=1)
+    t_knots: int = field(metadata=dict(static=True), default=2)
     n_splines: int = field(metadata=dict(static=True), default=1)
     s_knots: int = field(metadata=dict(static=True), default=7)
     n_points_per_spline_per_frame: int = field(metadata=dict(static=True), default=100)

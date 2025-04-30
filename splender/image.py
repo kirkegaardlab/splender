@@ -14,7 +14,7 @@ from jax.scipy.special import logit
 @dataclass
 class SplenderImage(Splender):
     
-    def __post_init__(self):
+    def __manual_post_init__(self):
         super().__post_init__()
 
         if self.init_knots is not None:
@@ -116,7 +116,5 @@ class SplenderImage(Splender):
     
     def __call__(self):
         knots = self.loc_params + self.knot_params
-        print(knots.shape)
-        print(self.global_scale.shape)
         images, lengths, curvatures = jax.vmap(self.render_image)(knots, self.global_scale)
         return images, lengths, curvatures

@@ -13,12 +13,12 @@ from jax.scipy.special import logit
 @jtu.register_dataclass
 @dataclass
 class SplenderVideo(Splender):
-    t_knots: int = field(metadata=dict(static=True), default=3)
-    n_frames: int = field(metadata=dict(static=True), default=10)
+    # t_knots: int = field(metadata=dict(static=True), default=3)
+    # n_frames: int = field(metadata=dict(static=True), default=10)
 
-    def __post_init__(self):
+    def __manual_post_init__(self):
         super().__post_init__()
-
+        # jax.debug.print("init_knots: {init_knots}", init_knots=self.init_knots)
         if self.init_knots is not None:
             if self.init_knots.ndim == 4:
                 # single image batch
@@ -26,12 +26,12 @@ class SplenderVideo(Splender):
             init_knot_params = logit(self.init_knots)
             init_param_mean = init_knot_params.mean(-3, keepdims=True)
             init_params = init_knot_params - init_param_mean
-            self.n_videos = init_knot_params.shape[0]
+            self.n_batch = init_knot_params.shape[0]
             self.n_splines = init_knot_params.shape[1]
             self.s_knots = init_knot_params.shape[2]
             self.t_knots = init_knot_params.shape[3]
-            self.loc_params = jnp.concatenate([init_param_mean, 5 * jnp.ones((self.n_videos, self.n_splines, 1, self.t_knots, 1))], axis=-1)
-            self.knot_params = jnp.concatenate([init_params, jnp.zeros((self.n_videos, self.n_splines, self.s_knots, self.t_knots, 1))], axis=-1)
+            self.loc_params = jnp.concatenate([init_param_mean, 5 * jnp.ones((self.n_batch, self.n_splines, 1, self.t_knots, 1))], axis=-1)
+            self.knot_params = jnp.concatenate([init_params, jnp.zeros((self.n_batch, self.n_splines, self.s_knots, self.t_knots, 1))], axis=-1)
         else:
             self.loc_params = jnp.zeros((self.n_splines, 1, 1, 3))
             self.knot_params = jnp.zeros((self.n_splines, self.s_knots, self.t_knots, 3))
