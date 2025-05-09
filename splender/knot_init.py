@@ -60,8 +60,8 @@ def get_splines_from_frame(frame, threshold = 0.5, neighbors = 'diagonal', thin 
     else:
         binary_img = frame > threshold
 
-    plt.figure()
-    plt.imshow(binary_img)
+    # plt.figure()
+    # plt.imshow(binary_img)
 
     if thin:
         neighbors = jnp.stack([binary_img, jnp.roll(binary_img, 1, axis = 0), jnp.roll(binary_img, 1, axis = 1)], axis=-1)
