@@ -10,6 +10,8 @@ Fit splines to images and videos through differentiable rendering.
 
 ## Usage
 
+Here is a basic example of trying to fit the number of 5 of the [MNIST](https://en.wikipedia.org/wiki/MNIST_database) dataset.
+
 ```python
 import splender
 import jax
@@ -33,9 +35,10 @@ x_spline, y_spline, _ = model.fit_spline(model.loc_params[0, 0] + model.knot_par
 s = jax.numpy.linspace(0, 1, 100) 
 final_splines = jax.numpy.stack([x_spline(s), y_spline(s)], axis=-1)
 ```
-
-which should result in 
-
+resulting in
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/ccef7f3f-cf2c-4137-9fbb-d55d708b0909" style="width: auto; height: 360px;" />
+</p>
 
 Some more elavorated example notebooks can be found under [`examples/`](examples/)
 
@@ -50,7 +53,7 @@ pip install splender
 
 ## Documentation
 
-Available at [readthedocs?]().
+PENDING
 
 For a more technical discussion on the model, please check out the [paper](https://doi.org/10.48550/arXiv.2503.14525)
 
