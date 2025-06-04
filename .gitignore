@@ -1,1 +1,10 @@
-__pycache__
+__pycache__/
+*.py[cod]
+*.pyo
+.vscode/
+.idea/
+*.swp
+.ipynb_checkpoints/
+.pybuilder/
+target/
+docs/_build/
