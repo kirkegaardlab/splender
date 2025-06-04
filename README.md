@@ -63,13 +63,14 @@ If you use `splender` in your research and need to reference it, please cite it 
 
 ```
 @article{zdyb2025splinerefinementdifferentiablerendering,
-      title={Spline refinement with differentiable rendering}, 
-      author={Frans Zdyb and Albert Alonso and Julius B. Kirkegaard},
-      year={2025},
-      eprint={2503.14525},
-      archivePrefix={arXiv},
-      primaryClass={eess.IV},
-      url={https://arxiv.org/abs/2503.14525}, 
+  title={Spline refinement with differentiable rendering},
+  author={Frans Zdyb and Albert Alonso and Julius B. Kirkegaard},
+  year={2025},
+  eprint={2503.14525},
+  archivePrefix={arXiv},
+  primaryClass={eess.IV},
+  url={https://arxiv.org/abs/2503.14525},
+  journal={arXiv preprint arXiv:2503.14525},
 }
 ```
 
