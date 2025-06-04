@@ -2,7 +2,10 @@
 
 [![arXiv](https://img.shields.io/badge/arXiv-2503.14525-b31b1b.svg?style=flat)](https://arxiv.org/abs/2503.14525)
 
-Fit splines to images and videos through differentiable rendering
+Fit splines to images and videos through differentiable rendering.
+
+![splender](https://github.com/user-attachments/assets/a0d23eae-5b04-4504-bf0e-f05dd7e4bdc8)
+
 
 ## Usage
 
