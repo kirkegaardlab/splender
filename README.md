@@ -1,6 +1,7 @@
 # splender
 
 [![arXiv](https://img.shields.io/badge/arXiv-2503.14525-b31b1b.svg?style=flat)](https://arxiv.org/abs/2503.14525)
+[![PyPI](https://img.shields.io/pypi/v/splender.svg)](https://pypi.org/project/splender/)
 
 Fit splines to images and videos through differentiable rendering.
 
@@ -11,9 +12,30 @@ Fit splines to images and videos through differentiable rendering.
 
 ```python
 import splender
+import jax
+from PIL import Image
+import numpy as np
 
+image = Image.open('img_5.png')
+image = np.array(image, dtype=np.float32) / 255.0
 
+init_splines = splender.knot_init.get_splines_from_frame(image)[0][:, ::-1]
+init_splines = jax.numpy.array(init_splines, dtype=jax.numpy.float32)
+init_knots = splender.knot_init.downsample_points(init_splines, 6)[None]
+
+key = jax.random.key(42)
+image = image[None]
+init_knots = init_knots[None] / 28
+
+model = splender.image.SplenderImage(key=key, init_knots=init_knots, res=28, global_scale=0.3)
+model, _ = splender.optim.fit(model, image, video=False)
+x_spline, y_spline, _ = model.fit_spline(model.loc_params[0, 0] + model.knot_params[0, 0])
+s = jax.numpy.linspace(0, 1, 100) 
+final_splines = jax.numpy.stack([x_spline(s), y_spline(s)], axis=-1)
 ```
+
+which should result in 
+
 
 Some more elavorated example notebooks can be found under [`examples/`](examples/)
 
@@ -22,6 +44,9 @@ Some more elavorated example notebooks can be found under [`examples/`](examples
 ```bash
 pip install splender
 ```
+
+> [!NOTE]
+> If you want it to run on GPU, remember to install it alongside the correct `jax` version: `pip install splender jax[cuda12]`
 
 ## Documentation
 

@@ -8,3 +8,6 @@ __pycache__/
 .pybuilder/
 target/
 docs/_build/
+*.egg-info
+.venv/
+venv/
