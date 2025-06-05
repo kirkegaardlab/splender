@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools", "wheel", "jax"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "splender"
+dynamic = ["version"]
+description = "Fit splines to images and videos through differentiable rendering."
+readme = "README.md"
+authors = [
+    {name = "Frans Zdyb", email = "frzd@di.ku.dk"},
+]
+license = {file = "LICENSE"}
+keywords = ["jax", "differentiable-rendering", "centerline", "spline", "machine-learning"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+]
+dependencies = ["jax", "rustworkx", "scikit-image", "interpax", "matplotlib", "optax"]
+
+[tool.setuptools.dynamic]
+version = {attr = "splender.__version__"}
+
+[project.urls]
+"Homepage" = "https://github.com/kirkegaardlab/splender"
+"Documentation" = "https://github.com/kirkegaardlab/splender"
+"Source" = "https://github.com/kirkegaardlab/splender"
+"Bug Tracker" = "https://github.com/kirkegaardlab/splender/issues"
