@@ -42,7 +42,7 @@ def video_loss(model, batch):
     return (loss_per_video + anchor_knot_reg + equal_length_reg + temporal_reg).sum()
 
 
-def fit(model, batch, n_iter=1000, lr=1e-2, video = True):
+def fit(model, batch, n_iter=1000, lr=1e-3, video = True):
     model.__manual_post_init__()
     # assert batch has values in [0, 1]
     assert jnp.all(batch >= 0) and jnp.all(batch <= 1)
